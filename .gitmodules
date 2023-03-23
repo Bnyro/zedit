@@ -1,0 +1,3 @@
+[submodule "capy-ui"]
+	path = capy-ui
+	url = https://github.com/capy-ui/capy

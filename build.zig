@@ -1,7 +1,7 @@
 const std = @import("std");
 const deps = @import("deps.zig");
 
-const PATH_TO_CAPY = ".zigmod/deps/git/github.com/capy-ui/capy/";
+const PATH_TO_CAPY = "capy-ui";
 
 pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
@@ -42,17 +42,6 @@ pub fn build(b: *std.build.Builder) !void {
         .optimize = optimize,
     });
     try deps.imports.capy.install(wasm, .{});
-
-    if (@import("builtin").zig_backend != .stage2_llvm) {
-        const serve = WebServerStep.create(b, wasm);
-        serve.step.dependOn(&wasm.step);
-        const serve_step = b.step("serve", "Start a local web server to run this application");
-        serve_step.dependOn(&serve.step);
-    } else {
-        var step = b.addLog("Please use 'zig build serve -fstage1'", .{});
-        const serve_step = b.step("serve", "Start a local web server to run this application");
-        serve_step.dependOn(&step.step);
-    }
 
     const exe_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
