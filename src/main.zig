@@ -1,26 +1,29 @@
 const std = @import("std");
 const capy = @import("capy");
 
-var text = capy.DataWrapper([]const u8).of("");
+var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+var alloc = arena.allocator();
+
+var text = capy.DataWrapper([]const u8).of("Hello World!");
 var fileName = capy.DataWrapper([]const u8).of("foo.txt");
 
 pub fn main() !void {
+    defer _ = arena.deinit();
+
     try capy.init();
 
     var window = try capy.Window.init();
 
     var monospace = capy.DataWrapper(bool).of(false);
-
-    var textArea = capy.TextArea(.{}).bind("monospace", &monospace).bind("text", &text);
-    textArea.setText("Hello World!");
-
     const margin = capy.Rectangle.init(10, 10, 10, 10);
 
     try window.set(capy.Column(.{ .spacing = 0 }, .{
-        capy.Expanded(capy.Margin(margin, &textArea)),
+        capy.Expanded(capy.Margin(margin, capy.TextArea(.{}).bind("monospace", &monospace).bind("text", &text))),
         capy.Margin(margin, capy.Align(.{}, capy.Row(.{}, .{ capy.CheckBox(.{ .label = "Monospaced" })
             .bind("checked", &monospace), capy.TextField(.{ .text = "foo.txt" }).bind("text", &fileName), capy.Button(.{ .label = "Save", .onclick = &saveBtn }) }))),
     }));
+
+    setup_initial_input() catch {};
 
     window.setMenuBar(capy.MenuBar(.{
         capy.Menu(.{ .label = "File" }, .{
@@ -42,6 +45,18 @@ pub fn main() !void {
     window.show();
 
     capy.runEventLoop();
+}
+
+fn setup_initial_input() anyerror!void {
+    const args = try std.process.argsAlloc(alloc);
+    defer std.process.argsFree(alloc, args);
+
+    if (args.len <= 1) return;
+
+    const fna = try std.fmt.allocPrint(alloc, "{s}", .{args[1]});
+    fileName.set(fna);
+
+    read();
 }
 
 fn close() void {
