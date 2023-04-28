@@ -4,26 +4,23 @@ const capy = @import("capy");
 var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 var alloc = arena.allocator();
 
-var text = capy.DataWrapper([]const u8).of("Hello World!");
-var fileName = capy.DataWrapper([]const u8).of("foo.txt");
+var text = capy.Atom([]const u8).of("Hello World!");
+var fileName = capy.Atom([]const u8).of("foo.txt");
+var monospace = capy.Atom(bool).of(false);
 
 pub fn main() !void {
     defer _ = arena.deinit();
 
-    try capy.init();
-
+    try capy.backend.init();
     var window = try capy.Window.init();
 
-    var monospace = capy.DataWrapper(bool).of(false);
     const margin = capy.Rectangle.init(10, 10, 10, 10);
-
     try window.set(capy.Column(.{ .spacing = 0 }, .{
-        capy.Expanded(capy.Margin(margin, capy.TextArea(.{}).bind("monospace", &monospace).bind("text", &text))),
-        capy.Margin(margin, capy.Align(.{}, capy.Row(.{}, .{ capy.CheckBox(.{ .label = "Monospaced" })
-            .bind("checked", &monospace), capy.TextField(.{ .text = "foo.txt" }).bind("text", &fileName), capy.Button(.{ .label = "Save", .onclick = &saveBtn }) }))),
+        capy.Expanded(capy.Margin(margin, capy.TextArea(.{}).bind("text", &text).bind("monospace", &monospace))),
+        capy.Margin(margin, capy.Align(.{}, capy.Row(.{}, .{ capy.CheckBox(.{ .label = "Monospaced" }).bind("checked", &monospace), capy.TextField(.{ .text = "foo.txt" }).bind("text", &fileName), capy.Button(.{ .label = "Save", .onclick = &saveBtn }) }))),
     }));
 
-    setup_initial_input() catch {};
+    setup_initial_input();
 
     window.setMenuBar(capy.MenuBar(.{
         capy.Menu(.{ .label = "File" }, .{
@@ -47,13 +44,12 @@ pub fn main() !void {
     capy.runEventLoop();
 }
 
-fn setup_initial_input() anyerror!void {
-    const args = try std.process.argsAlloc(alloc);
+fn setup_initial_input() void {
+    const args = std.process.argsAlloc(alloc) catch return;
     defer std.process.argsFree(alloc, args);
-
     if (args.len <= 1) return;
 
-    const fna = try std.fmt.allocPrint(alloc, "{s}", .{args[1]});
+    const fna = std.fmt.allocPrint(alloc, "{s}", .{args[1]}) catch return;
     fileName.set(fna);
 
     read();
@@ -79,19 +75,15 @@ fn save() void {
     _ = bytes_written;
 }
 
-// TODO: get rid of limited file size!
 fn read() void {
     const file = std.fs.cwd().openFile(
         fileName.get(),
         .{},
     ) catch return;
+
     defer file.close();
-
-    var buffer: [1024]u8 = undefined;
-    file.seekTo(0) catch return;
-    const fileSize = file.readAll(&buffer) catch return;
-
-    text.set(buffer[0..fileSize]);
+    const buffer = file.readToEndAlloc(alloc, std.math.maxInt(usize)) catch return;
+    text.set(buffer);
 }
 
 fn delete() void {
